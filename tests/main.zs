@@ -1,8 +1,8 @@
-
-func byte Main() {
-    var App app;
-    var byte ex;
-    return ex;
+func void printf(byte data) {
+    
 };
 
-var const byte abc;
+func void Main() {
+    var byte a;
+    printf(a);
+};

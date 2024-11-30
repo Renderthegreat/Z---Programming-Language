@@ -18,6 +18,57 @@ int SAVED_PAREN_COUNT = 0;
 vector<ZPiece> parse(const vector<Token>& tokens, int level) {
     ZPiece piece;
     for (size_t i = 0; i < tokens.size(); i++) {
+        auto parseFunctionParameters = [&](Bool isDefinition) {
+            vector<ZParameter> parameters;
+            ZParameter parameter;
+            SAVED_PAREN_COUNT = PAREN_COUNT;
+            PAREN_COUNT = 0;
+            int z = 1;
+            cout << "\n Function Parameters:\n";
+            while (true) {
+                cout << tokens[i].value;
+                if (tokens[i].type == TokenType::RIGHT_PAREN) {
+                    PAREN_COUNT--;
+                    if (PAREN_COUNT == 0) {
+                        i++;
+                        break;
+                    }
+                    i++;
+                    continue;
+                }
+                if (tokens[i].type == TokenType::LEFT_PAREN) {
+                    PAREN_COUNT++;
+                    i++;
+                    continue;
+                }
+                if (i > tokens.size()) {
+                    Zerror(UNEXPECTED_END_OF_FILE, NULL);
+                }
+                if (tokens[i].type != TokenType::IDENTIFIER && tokens[i].type != TokenType::COMMA) {
+                    Zerror(UNEXPECTED_FUNCTION_ARGUMENT, &tokens[i].value, tokens[i].line, tokens[i].pos);
+                }
+                else if (tokens[i].type != TokenType::COMMA) {
+                    if (z == 1) {
+                        parameter.name = tokens[i].value;
+                        cout << "\nName:" + parameter.name + "\n";
+                        parameters.push_back(parameter);
+                    }
+                    if (z == 0) {
+                        parameter.type = tokens[i].value;
+                        cout << "\nType:" + parameter.type;
+                        z = 1;
+                    }
+                } else {
+                    if (isTrue(isDefinition)) {
+                        z = 0;
+                    }
+                }
+                i++;
+            }
+            PAREN_COUNT = SAVED_PAREN_COUNT;
+            return parameters;
+        };
+
         auto makeString = [&](StringType stringType) {
             ZStringLiteral stringLiteral;
             piece.ptype = ZPieceType::ZStringLiteral_t;
@@ -66,6 +117,7 @@ vector<ZPiece> parse(const vector<Token>& tokens, int level) {
                 }
             }
             i++;
+            PIECES.push_back(piece);
         };
 
         auto makeFunction = [&] () {
@@ -73,41 +125,21 @@ vector<ZPiece> parse(const vector<Token>& tokens, int level) {
             i++;
             function.type = tokens[i].value;
             function.name = tokens[i+1].value;
-	    i++;            
+	        i++;            
             piece.function = function;
             piece.depth = level;
             piece.ptype = ZPieceType::ZFunction_t;
-            PIECES.push_back(piece);
             vector<Token> functionTokens;
             PAREN_COUNT++;
             cout << "\n Function \n Name: " + (piece.function.name) + "\n Type: " + (piece.function.type) + '\n';
-            while (true) {
-                cout << tokens[i].value + "\n";
-                if (tokens[i].type == TokenType::RIGHT_PAREN) {
-                    PAREN_COUNT--;
-                    if (CURLY_BRACK_COUNT == 0) {
-                        break;
-                    }
-                    i++;
-                    continue;
-                }
-                if (tokens[i].type == TokenType::LEFT_PAREN) {
-                    PAREN_COUNT++;
-                    i++;
-                    continue;
-                }
-                if (i > tokens.size()) {
-                    Zerror(UNEXPECTED_END_OF_FILE, NULL);
-                }
-                if (tokens[i].type != TokenType::IDENTIFIER && tokens[i].type != TokenType::COMMA) {
-                    Zerror(UNEXPECTED_FUNCTION_ARGUMENT, &tokens[i].value, tokens[i].line,tokens[i].pos);
-                }
-                i++;
-            }
             PAREN_COUNT--;
-            i+=2;
+            i++;
+            parseFunctionParameters(True); // For now, do nothing
+            i++;
+            PIECES.push_back(piece);
             if (i < tokens.size() && tokens[i].type != TokenType::LEFT_CURLY_BRACK) {
                 SAVED_CURLY_BRACK_COUNT = CURLY_BRACK_COUNT;
+                CURLY_BRACK_COUNT = 1;
                 
                 while (i < tokens.size()) {
                     if (tokens[i].type == TokenType::LEFT_CURLY_BRACK) {
@@ -126,9 +158,22 @@ vector<ZPiece> parse(const vector<Token>& tokens, int level) {
                     functionTokens.push_back(tokens[i]);
                     i++;
                 }
+                CURLY_BRACK_COUNT = SAVED_CURLY_BRACK_COUNT;
                 parse(functionTokens, level + 1);  // Recursively parse the function body
-                i++;
+                //i++;
             }
+        };
+
+        auto makeFunctionCall = [&]() {
+            ZFunctionCall functionCall;
+            functionCall.name = tokens[i].value;
+            i++;
+            functionCall.parameters = parseFunctionParameters(False);
+            piece.functionCall = functionCall;
+            piece.depth = level;
+            piece.ptype = ZPieceType::ZFunctionCall_t;
+            
+            PIECES.push_back(piece);
         };
 
         auto makeClass = [&]() {
@@ -138,7 +183,6 @@ vector<ZPiece> parse(const vector<Token>& tokens, int level) {
             piece.class_ = class_;
             piece.depth = level;
             piece.ptype = ZPieceType::ZClass_t;
-            PIECES.push_back(piece);
             vector<Token> classTokens;
             i++;
             cout << "\n Class \n Name: " + (piece.class_.name) + '\n';
@@ -159,6 +203,7 @@ vector<ZPiece> parse(const vector<Token>& tokens, int level) {
                 classTokens.push_back(tokens[i]);
                 i++;
             }
+            PIECES.push_back(piece);
         };
         
 
@@ -199,6 +244,10 @@ vector<ZPiece> parse(const vector<Token>& tokens, int level) {
             }
             if (i < tokens.size() && tokens[i].type == TokenType::IDENTIFIER && tokens[i].value == "class") {
                 makeClass();
+                continue;
+            }
+            if (i < tokens.size() && tokens[i].type == TokenType::IDENTIFIER && tokens[i+1].value == "(") {
+                makeFunctionCall();
                 continue;
             }
         } else {

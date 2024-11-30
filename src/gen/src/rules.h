@@ -39,22 +39,5 @@
 .global zsharp_metadata
 zsharp_metadata:
     .ascii  "Z#"                // Z# identifier
-    .long   1732843523       // Build timestamp (UNIX time)
+    .long   [^UNIX_TIME^]       // Build timestamp (UNIX time)
     .byte   0
-#include "zs.h"
-.bss
-.data
-	TYPEDEF(void) = 0x00000000
-	TYPEDEF(byte) = 0x00000001
-.text
-FUNCDEF(Main):
-    POOL CREATE ax
-    POOL SWAP ax
-	PARAM CLEAR
-	PARAM PUSH $1
-	FUNCTION CALL printf
-.global main
-main:
-	ZS INIT
-	FUNCTION CALL "Main"
-	ZS END
